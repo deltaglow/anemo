@@ -1,0 +1,24 @@
+{
+  "name": "deltaglow/anemo",
+  "description": "Swoole Http Client Wrapper",
+  "minimum-stability": "stable",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Robert Grencik",
+      "email": "grencik@proton.me"
+    }
+  ],
+  "type": "library",
+  "require": {
+    "php": ">=8.0",
+    "ext-json": "*",
+    "ext-swoole": ">=6.0",
+    "guzzlehttp/psr7": "^2.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "DeltaGlow\\Anemo\\": "src/"
+    }
+  }
+}
