@@ -8,7 +8,7 @@ use Swoole\Coroutine\Http\Client;
 
 class HttpClient extends BaseHttpClient
 {
-    protected function doRequest(string $method, Uri $uri, $body): Response
+    protected function doRequest(string $method, Uri $uri, string|array $body = ''): Response
     {
 
         $client = new Client($uri->getHost(), $uri->getPort(), $uri->getScheme() === 'https');

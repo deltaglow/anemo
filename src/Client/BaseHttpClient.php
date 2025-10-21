@@ -2,6 +2,7 @@
 
 namespace DeltaGlow\Anemo\Client;
 
+use DeltaGlow\Anemo\Exception\HttpException;
 use DeltaGlow\Anemo\Response\Response;
 use GuzzleHttp\Psr7\Uri;
 
@@ -9,9 +10,9 @@ abstract class BaseHttpClient extends BaseClient
 {
     protected string $body_format = 'json';
 
-    abstract protected function doRequest(string $method, Uri $uri, $body): Response;
+    abstract protected function doRequest(string $method, Uri $uri, string|array $body): Response;
 
-    public function request(string $method, string $url, array $body = []): mixed
+    public function request(string $method, string $url, string|array $body = ''): mixed
     {
         $uri = $this->buildUri($url);
 
@@ -30,22 +31,22 @@ abstract class BaseHttpClient extends BaseClient
         return $this->request('GET', $url);
     }
 
-    public function post(string $url, array $body = []): mixed
+    public function post(string $url, string|array $body = ''): mixed
     {
         return $this->request('POST', $url, $body);
     }
 
-    public function put(string $url, array $body = []): mixed
+    public function put(string $url, string|array $body = ''): mixed
     {
         return $this->request('PUT', $url, $body);
     }
 
-    public function patch(string $url, array $body = []): mixed
+    public function patch(string $url, string|array $body = ''): mixed
     {
         return $this->request('PATCH', $url, $body);
     }
 
-    public function delete(string $url, array $body = []): mixed
+    public function delete(string $url, string|array $body = ''): mixed
     {
         return $this->request('DELETE', $url, $body);
     }
@@ -95,7 +96,7 @@ abstract class BaseHttpClient extends BaseClient
         return $uri;
     }
 
-    protected function prepareBody(array $data): string|false
+    protected function prepareBody(string|array $data): string|false
     {
         if (empty($data)) {
             return '';
@@ -106,9 +107,12 @@ abstract class BaseHttpClient extends BaseClient
         }
 
         if ($this->body_format === 'form_params') {
+            if (!is_array($data) && !is_object($data)) {
+                throw new HttpException('Form parameters must be an array or object.');
+            }
             return http_build_query($data);
         }
 
-        return '';
+        return $data;
     }
 }

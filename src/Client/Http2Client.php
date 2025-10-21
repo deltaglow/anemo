@@ -9,7 +9,7 @@ use Swoole\Http2\Request;
 
 class Http2Client extends BaseHttpClient
 {
-    protected function doRequest(string $method, Uri $uri, $body): Response
+    protected function doRequest(string $method, Uri $uri, string|array $body = ''): Response
     {
         $port = $uri->getPort();
         if($port === null) {
