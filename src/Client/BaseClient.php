@@ -95,12 +95,6 @@ abstract class BaseClient
             }
         }
 
-        /*if ($this->options['proxy']) {
-            $proxyParsed = parse_url($this->options['proxy']);
-            $settings['http_proxy_host'] = $proxyParsed['host'];
-            $settings['http_proxy_port'] = $proxyParsed['port'] ?? 80;
-        }*/
-
         return $settings;
     }
 

@@ -2,13 +2,14 @@
 
 namespace DeltaGlow\Anemo\Client;
 
+use DeltaGlow\Anemo\Enum\BodyFormat;
 use DeltaGlow\Anemo\Exception\HttpException;
 use DeltaGlow\Anemo\Response\Response;
 use GuzzleHttp\Psr7\Uri;
 
 abstract class BaseHttpClient extends BaseClient
 {
-    protected string $body_format = 'json';
+    protected BodyFormat $body_format = BodyFormat::Text;
 
     abstract protected function doRequest(string $method, Uri $uri, string|array $body): Response;
 
@@ -65,7 +66,7 @@ abstract class BaseHttpClient extends BaseClient
      */
     public function asJson(): self
     {
-        $this->body_format = 'json';
+        $this->body_format = BodyFormat::Json;
         $this->headers['Content-Type'] = 'application/json';
         return $this;
     }
@@ -75,7 +76,7 @@ abstract class BaseHttpClient extends BaseClient
      */
     public function asForm(): self
     {
-        $this->body_format = 'form_params';
+        $this->body_format = BodyFormat::FormParams;
         $this->headers['Content-Type'] = 'application/x-www-form-urlencoded';
         return $this;
     }
@@ -102,11 +103,14 @@ abstract class BaseHttpClient extends BaseClient
             return '';
         }
 
-        if ($this->body_format === 'json') {
+        if($this->body_format === BodyFormat::Text) {
+            if(is_array($data)) {
+                $data = implode(PHP_EOL, $data);
+            }
+            return $data;
+        } elseif ($this->body_format === BodyFormat::Json) {
             return json_encode($data);
-        }
-
-        if ($this->body_format === 'form_params') {
+        } elseif ($this->body_format === BodyFormat::FormParams) {
             if (!is_array($data) && !is_object($data)) {
                 throw new HttpException('Form parameters must be an array or object.');
             }

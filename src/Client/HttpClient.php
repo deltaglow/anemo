@@ -10,8 +10,12 @@ class HttpClient extends BaseHttpClient
 {
     protected function doRequest(string $method, Uri $uri, string|array $body = ''): Response
     {
+        $port = $uri->getPort();
+        if($port === null) {
+            $port = $uri->getScheme() === 'https' ? 443 : 80;
+        }
 
-        $client = new Client($uri->getHost(), $uri->getPort(), $uri->getScheme() === 'https');
+        $client = new Client($uri->getHost(), $port, $uri->getScheme() === 'https');
         $client->set($this->buildSettings());
         $client->setHeaders($this->headers);
         $client->setCookies($this->cookies);
