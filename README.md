@@ -32,9 +32,7 @@ $response = $client->get('https://api.example.com/users');
 var_dump($response->getBody());
 
 // POST request with JSON body
-$response = $client->post('https://api.example.com/users', [
-    'json' => ['name' => 'John Doe', 'email' => 'john@example.com']
-]);
+$response = $client->asJson()->post('https://api.example.com/users', ['name' => 'John Doe', 'email' => 'john@example.com']);
 ```
 
 ### HTTP/2 Request
@@ -51,7 +49,7 @@ $response = $client->get('https://http2.example.com/stream');
 
 ### WebSockets
 
-Use `Anemo::ws()` to interact with WebSocket servers.
+Use `Anemo::ws()` to interact with WebSocket servers. It automatically handles to pings.
 
 ```php
 use DeltaGlow\Anemo\Anemo;
@@ -60,15 +58,27 @@ $ws = Anemo::ws();
 
 if ($ws->connect('wss://echo.websocket.org')) {
     $ws->push('Hello Swoole!');
-    $message = $ws->recv();
-    echo "Received: {$message->data}\n";
+    $frame = $ws->receive();
+    echo "Received: {$frame->data}\n";
+    
+    $ws->pushText('This is a text message');
+    $ws->receiveText();
+    
+    $ws->pushBinary('This is a binary message');
+    $ws->receive();
+    
+    $ws->pushJson(['foo' => 'bar']);
+    $ws->receiveJson();
+    
     $ws->close();
 }
 ```
 
 ### Concurrent Requests (Pool)
 
-Execute multiple requests concurrently using `Anemo::pool()`. Attention: This method needs to be called within a coroutine.
+Execute multiple requests concurrently using `Anemo::pool()`. 
+
+**Attention**: This method needs to be called within a coroutine.
 
 ```php
 use DeltaGlow\Anemo\Anemo;

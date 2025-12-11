@@ -15,7 +15,7 @@ class Response
     public function __construct(Client|Http2Response $object)
     {
         $this->object = $object;
-        if($object instanceof Client) {
+        if ($object instanceof Client) {
             $this->body = $object->getBody() ?? '';
             $this->statusCode = $object->getStatusCode();
             $this->headers = $object->getHeaders() ?? [];
@@ -93,7 +93,7 @@ class Response
      */
     public function failed(): bool
     {
-        return $this->serverError() || $this->clientError();
+        return $this->statusCode < 200 || $this->serverError() || $this->clientError();
     }
 
     /**

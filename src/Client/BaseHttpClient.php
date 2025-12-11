@@ -85,13 +85,13 @@ abstract class BaseHttpClient extends BaseClient
     {
         $uri = new Uri($url);
 
-        if($this->base_uri !== null) {
+        if ($this->base_uri !== null) {
             $base = new Uri($this->base_uri);
 
             $uri = $uri->withScheme($base->getScheme());
             $uri = $uri->withHost($base->getHost());
             $uri = $uri->withPort($base->getPort());
-            $uri = $uri->withPath(rtrim($base->getPath(), '/').'/'.ltrim($uri->getPath(), '/'));
+            $uri = $uri->withPath(rtrim($base->getPath(), '/') . '/' . ltrim($uri->getPath(), '/'));
         }
 
         return $uri;
@@ -103,13 +103,17 @@ abstract class BaseHttpClient extends BaseClient
             return '';
         }
 
-        if($this->body_format === BodyFormat::Text) {
-            if(is_array($data)) {
+        if ($this->body_format === BodyFormat::Text) {
+            if (is_array($data)) {
                 $data = implode(PHP_EOL, $data);
             }
             return $data;
         } elseif ($this->body_format === BodyFormat::Json) {
-            return json_encode($data);
+            $json = json_encode($data);
+            if ($json === false) {
+                throw new HttpException('Failed to encode body as JSON: ' . json_last_error_msg());
+            }
+            return $json;
         } elseif ($this->body_format === BodyFormat::FormParams) {
             if (!is_array($data) && !is_object($data)) {
                 throw new HttpException('Form parameters must be an array or object.');

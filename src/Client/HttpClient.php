@@ -11,7 +11,7 @@ class HttpClient extends BaseHttpClient
     protected function doRequest(string $method, Uri $uri, string|array $body = ''): Response
     {
         $port = $uri->getPort();
-        if($port === null) {
+        if ($port === null) {
             $port = $uri->getScheme() === 'https' ? 443 : 80;
         }
 
@@ -21,7 +21,11 @@ class HttpClient extends BaseHttpClient
         $client->setCookies($this->cookies);
         $client->setData($this->prepareBody($body));
         $client->setMethod($method);
-        $client->execute((string)$this->buildPath($uri));
+        $client->execute((string) $this->buildPath($uri));
+
+        if ($client->errCode !== 0) {
+            throw new \DeltaGlow\Anemo\Exception\HttpException('Request failed: ' . $client->errMsg, $client->errCode);
+        }
 
         // Update cookies (simplified, no domain/path/expiry handling)
         $this->cookies = $client->getCookies();
