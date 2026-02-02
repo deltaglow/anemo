@@ -2,11 +2,37 @@
 
 namespace DeltaGlow\Anemo\Response;
 
+use Swoole\Coroutine;
 use Swoole\Coroutine\Http\Client;
 use Swoole\WebSocket\Frame;
 
 class WsConnection extends Client
 {
+    private int $autoping_cid;
+    protected \Closure $event_close_handler;
+
+    public function startAutoping(int $interval, null|\Closure $data_callback): void
+    {
+        $this->autoping_cid = Coroutine::create(function () use ($interval, $data_callback) {
+            while(true) {
+                Coroutine::sleep($interval);
+                $data = null;
+                if($data_callback instanceof \Closure) {
+                    $data = call_user_func($data_callback);
+                }
+                $this->ping($data);
+            }
+        });
+    }
+
+    public function stopAutoping(): void
+    {
+        if(!isset($this->autoping_cid)) {
+            return;
+        }
+        Coroutine::cancel($this->autoping_cid);
+    }
+
     /**
      * @param string $text
      * @return bool
@@ -26,6 +52,16 @@ class WsConnection extends Client
         return $this->push(json_encode($data), WEBSOCKET_OPCODE_TEXT);
     }
 
+    public function ping(?string $data = null): bool
+    {
+        return $this->push($data, WEBSOCKET_OPCODE_PING);
+    }
+
+    public function pong(?string $data = null): bool
+    {
+        return $this->push($data, WEBSOCKET_OPCODE_PONG);
+    }
+
     /**
      * Overrides the parent's recv() method to automatically handle PING/PONG frames.
      *
@@ -40,6 +76,7 @@ class WsConnection extends Client
 
             if ($frame === false) {
                 // Error or timeout occurred. Return false to the caller.
+                $this->executeCloseEvent();
                 return false;
             }
 
@@ -63,6 +100,7 @@ class WsConnection extends Client
                         // You might want to handle connection closing logic here.
                         // For now, treat it like an application frame or return it depending on desired behavior.
                         // Returning the frame:
+                        $this->executeCloseEvent();
                         return $frame;
 
                     default:
@@ -74,8 +112,17 @@ class WsConnection extends Client
                 // This case is unlikely if the parent method returns Frame|false|string,
                 // but if it returned a string (often configured via flags not available here),
                 // we'd return it. In standard Swoole usage, it returns a Frame object.
+                $this->executeCloseEvent();
                 return $frame;
             }
+        }
+    }
+
+    private function executeCloseEvent(): void
+    {
+        $this->stopAutoping();
+        if(isset($this->event_close_handler)) {
+            ($this->event_close_handler)($this);
         }
     }
 
@@ -95,5 +142,11 @@ class WsConnection extends Client
             return false;
         }
         return $frame->data;
+    }
+
+    public function onClose(callable $callback): self
+    {
+        $this->event_close_handler = $callback;
+        return $this;
     }
 }

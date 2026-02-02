@@ -4,36 +4,54 @@ namespace DeltaGlow\Anemo\Client;
 
 use DeltaGlow\Anemo\Pool;
 use GuzzleHttp\Psr7\Uri;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 abstract class BaseClient
 {
     // Properties for pool requests
     protected string $method;
-    protected ?string $base_uri = null;
-    protected ?string $proxy_uri = null;
-    protected ?string $http_proxy_host = null;
-    protected ?int $http_proxy_port = null;
-    protected ?string $http_proxy_user = null;
-    protected ?string $http_proxy_password = null;
-    protected int $timeout = 0;
-    protected array $headers = [];
+    protected array $options = [];
     protected array $cookies = [];
-    protected bool $ssl_verify_peer = true;
-    protected bool $ssl_allow_self_signed = false;
-    protected ?string $ssl_cert_file = null;
-    protected ?string $ssl_key_file = null;
-    protected ?string $ssl_passphrase = null;
-    protected ?string $ssl_cafile = null;
-    protected ?string $ssl_capath = null;
-
+    protected array $headers = [];
     protected ?Pool $pool = null;
     protected ?string $pool_key = null;
 
     public function __construct(array $options = [])
     {
-        foreach($options as $attribute => $value) {
-            $this->{$attribute} = $value;
-        }
+        $this->resolveOptions($options);
+    }
+
+    private function resolveOptions(array $options): void
+    {
+        $resolver = new OptionsResolver();
+
+        $resolver->define('base_uri')->allowedTypes('string', 'null')->default(null);
+        $resolver->define('timeout')->allowedTypes('int', 'null')->default(0);
+        $resolver->define('keep_alive')->allowedTypes('bool')->default(false);
+        $resolver->setOptions('proxy', function (OptionsResolver $resolver) {
+            $resolver->define('uri')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('host')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('port')->allowedTypes('int', 'null')->default(null);
+            $resolver->define('user')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('password')->allowedTypes('string', 'null')->default(null);
+        });
+        $resolver->setOptions('ssl', function (OptionsResolver $resolver) {
+            $resolver->define('verify_peer')->allowedTypes('bool')->default(true);
+            $resolver->define('host_name')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('allow_self_signed')->allowedTypes('bool')->default(false);
+            $resolver->define('cert_file')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('key_file')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('passphrase')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('cafile')->allowedTypes('string', 'null')->default(null);
+            $resolver->define('capath')->allowedTypes('string', 'null')->default(null);
+        });
+        $resolver->setOptions('ws', function (OptionsResolver $resolver) {
+            $resolver->define('autoping')->allowedTypes('bool')->default(false);
+            $resolver->define('autoping_interval')->allowedTypes('int')->default(15);
+            $resolver->define('autoping_data')->allowedTypes('Closure', 'null')->default(null);
+        });
+
+        $this->options = $resolver->resolve($options);
     }
 
     public function setPool(Pool $pool, ?string $key = null): void
@@ -62,19 +80,22 @@ abstract class BaseClient
     protected function buildSettings(): array
     {
         $settings = [
-            'ssl_verify_peer' => $this->ssl_verify_peer,
-            'ssl_allow_self_signed' => $this->ssl_allow_self_signed,
-            'ssl_cert_file' => $this->ssl_cert_file,
-            'ssl_key_file' => $this->ssl_key_file,
-            'ssl_passphrase' => $this->ssl_passphrase,
-            'ssl_cafile' => $this->ssl_cafile,
-            'ssl_capath' => $this->ssl_capath,
-            'timeout' => $this->timeout,
+            'ssl_verify_peer' => $this->options['ssl']['verify_peer'],
+            'ssl_host_name' => $this->options['ssl']['host_name'],
+            'ssl_allow_self_signed' => $this->options['ssl']['allow_self_signed'],
+            'ssl_cert_file' => $this->options['ssl']['cert_file'],
+            'ssl_key_file' => $this->options['ssl']['key_file'],
+            'ssl_passphrase' => $this->options['ssl']['passphrase'],
+            'ssl_cafile' => $this->options['ssl']['cafile'],
+            'ssl_capath' => $this->options['ssl']['capath'],
+            'timeout' => $this->options['timeout'],
+            'keep_alive' => $this->options['keep_alive'],
         ];
 
-        if($this->proxy_uri !== null) {
+        // setup proxy
+        if($this->options['proxy']['uri'] !== null) {
             // format username:password@host:port
-            $uri = new Uri($this->proxy_uri);
+            $uri = new Uri($this->options['proxy']['uri']);
             if($uri->getUserInfo() !== null) {
                 list($user, $pass) = explode(':', $uri->getUserInfo());
                 $settings['http_proxy_user'] = $user;
@@ -82,16 +103,17 @@ abstract class BaseClient
             }
             $settings['http_proxy_host'] = $uri->getHost();
             $settings['http_proxy_port'] = $uri->getPort();
-        } else {
-            $settings['http_proxy_host'] = $this->http_proxy_host;
-            $settings['http_proxy_user'] = $this->http_proxy_user;
 
-            if($this->http_proxy_port !== null) {
-                $settings['http_proxy_port'] = $this->http_proxy_port;
+        } elseif($this->options['proxy']['host'] !== null) {
+            $settings['http_proxy_host'] = $this->options['proxy']['host'];
+            $settings['http_proxy_user'] = $this->options['proxy']['user'];
+
+            if($this->options['proxy']['port'] !== null) {
+                $settings['http_proxy_port'] = $this->options['proxy']['port'];
             }
 
-            if($this->http_proxy_password !== null) {
-                $settings['http_proxy_password'] = $this->http_proxy_password;
+            if($this->options['proxy']['password'] !== null) {
+                $settings['http_proxy_password'] = $this->options['proxy']['password'];
             }
         }
 

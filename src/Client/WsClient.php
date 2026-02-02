@@ -7,9 +7,12 @@ use DeltaGlow\Anemo\Response\WsConnection;
 use GuzzleHttp\Psr7\Uri;
 
 class WsClient extends BaseClient {
-    public function upgrade(string $url): ?WsConnection
+    public function upgrade(string|Uri $url): ?WsConnection
     {
-        $uri = new Uri($url);
+        if(is_string($url)) {
+            $uri = new Uri($url);
+        }
+
         if ($this->pool) {
             $this->pool->addRequest($this->pool_key, function () use ($uri) {
                 return $this->doUpgrade($uri);
@@ -31,6 +34,10 @@ class WsClient extends BaseClient {
         $client->set($this->buildSettings());
         $client->setHeaders($this->headers);
         $client->setCookies($this->cookies);
+
+        if($this->options['ws']['autoping']) {
+            $client->startAutoping($this->options['ws']['autoping_interval'], $this->options['ws']['autoping_data']);
+        }
 
         $upgraded = $client->upgrade((string)$this->buildPath($uri));
         if (!$upgraded) {

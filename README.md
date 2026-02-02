@@ -42,7 +42,7 @@ Use `Anemo::http2()` for HTTP/2 support.
 ```php
 use DeltaGlow\Anemo\Anemo;
 
-$client = Anemo::http2(['ssl_verify_peer' => false]);
+$client = Anemo::http2(['ssl' => ['verify_peer' => false]]);
 
 $response = $client->get('https://http2.example.com/stream');
 ```
@@ -56,7 +56,7 @@ use DeltaGlow\Anemo\Anemo;
 
 $ws = Anemo::ws();
 
-if ($ws->connect('wss://echo.websocket.org')) {
+if ($ws->upgrade('wss://echo.websocket.org')) {
     $ws->push('Hello Swoole!');
     $frame = $ws->receive();
     echo "Received: {$frame->data}\n";
@@ -109,14 +109,28 @@ var_dump($results['posts']['result']);
 
 The client factory methods accept an array of options:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `timeout` | int | 0 | Request timeout in seconds |
-| `base_uri` | string | null | Base URI for requests |
-| `http_proxy_host` | string | null | Proxy host |
-| `http_proxy_port` | int | null | Proxy port |
-| `ssl_verify_peer` | bool | true | Verify SSL certificate |
-| `headers` | array | [] | Default request headers |
+| Option            | Type   | Default | Description                                          |
+|-------------------|--------|---------|------------------------------------------------------|
+| `base_uri`   | `string \| null` |  `null` | Base URI for requests (prepended to relative paths). |
+| `timeout`    | `int \| null`    |     `0` | Request timeout in seconds (`0` is no timeout).      |
+| `keep_alive` | `bool`           | `false` | Whether to reuse connections (HTTP keep-alive).      |
+| `proxy.uri`      | `string \| null` |  `null` | Full proxy URI (e.g., `http://user:pass@host:port`). If set, it override the individual host/port/user/password fields. |
+| `proxy.host`     | `string \| null` |  `null` | Proxy hostname or IP.                                                                                                       |
+| `proxy.port`     | `int \| null`    |  `null` | Proxy port number.                                                                                                          |
+| `proxy.user`     | `string \| null` |  `null` | Username for proxy authentication.                                                                                          |
+| `proxy.password` | `string \| null` |  `null` | Password for proxy authentication.                                                                                          |
+| `ssl.verify_peer`       | `bool`           |  `true` | Verify the peer’s SSL certificate. Set to `false` to skip verification (not recommended). |
+| `ssl.host_name`         | `string \| null` |  `null` | Expected peer hostname (for SNI/verification).                                            |
+| `ssl.allow_self_signed` | `bool`           | `false` | Allow self-signed certificates when verifying.                                            |
+| `ssl.cert_file`         | `string \| null` |  `null` | Path to client certificate file.                                                          |
+| `ssl.key_file`          | `string \| null` |  `null` | Path to client private key file.                                                          |
+| `ssl.passphrase`        | `string \| null` |  `null` | Passphrase for the private key, if encrypted.                                             |
+| `ssl.cafile`            | `string \| null` |  `null` | Path to a CA bundle file for verification.                                                |
+| `ssl.capath`            | `string \| null` |  `null` | Path to a directory containing CA certificates.                                           |
+| `ws.autoping`          | `bool`            | `false` | Automatically send ping frames to keep the connection alive. |
+| `ws.autoping_interval` | `int`             |    `15` | Interval in seconds between auto-pings.                      |
+| `ws.autoping_data`     | `Closure \| null` |  `null` | Callable returning the ping payload (if any).                |
+
 
 ### Request Helpers
 

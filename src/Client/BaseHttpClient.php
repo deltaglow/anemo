@@ -85,8 +85,8 @@ abstract class BaseHttpClient extends BaseClient
     {
         $uri = new Uri($url);
 
-        if ($this->base_uri !== null) {
-            $base = new Uri($this->base_uri);
+        if ($this->options['base_uri'] !== null) {
+            $base = new Uri($this->options['base_uri']);
 
             $uri = $uri->withScheme($base->getScheme());
             $uri = $uri->withHost($base->getHost());
