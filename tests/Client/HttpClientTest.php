@@ -3,7 +3,7 @@
 namespace DeltaGlow\Anemo\Tests\Client;
 
 use DeltaGlow\Anemo\Client\HttpClient;
-use GuzzleHttp\Psr7\Uri;
+use Uri\Rfc3986\Uri;
 use PHPUnit\Framework\TestCase;
 
 class HttpClientTest extends TestCase

@@ -3,8 +3,8 @@
 namespace DeltaGlow\Anemo\Client;
 
 use DeltaGlow\Anemo\Response\Response;
-use GuzzleHttp\Psr7\Uri;
 use Swoole\Coroutine\Http\Client;
+use Uri\Rfc3986\Uri;
 
 class HttpClient extends BaseHttpClient
 {
@@ -21,7 +21,7 @@ class HttpClient extends BaseHttpClient
         $client->setCookies($this->cookies);
         $client->setData($this->prepareBody($body));
         $client->setMethod($method);
-        $client->execute((string) $this->buildPath($uri));
+        $client->execute($uri->toString());
 
         if ($client->errCode !== 0) {
             throw new \DeltaGlow\Anemo\Exception\HttpException('Request failed: ' . $client->errMsg, $client->errCode);

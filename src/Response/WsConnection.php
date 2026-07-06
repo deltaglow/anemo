@@ -2,6 +2,9 @@
 
 namespace DeltaGlow\Anemo\Response;
 
+use DeltaGlow\Anemo\Exception\WsFalseFrame;
+use DeltaGlow\Anemo\Exception\WsJsonNotValid;
+use DeltaGlow\Anemo\Exception\WsConnectionClosed;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Http\Client;
 use Swoole\WebSocket\Frame;
@@ -10,17 +13,27 @@ class WsConnection extends Client
 {
     private int $autoping_cid;
     protected \Closure $event_close_handler;
+    private bool $closed = false;
 
     public function startAutoping(int $interval, null|\Closure $data_callback): void
     {
+        $this->stopAutoping();
+
         $this->autoping_cid = Coroutine::create(function () use ($interval, $data_callback) {
             while(true) {
                 Coroutine::sleep($interval);
                 $data = null;
                 if($data_callback instanceof \Closure) {
-                    $data = call_user_func($data_callback);
+                    try {
+                        $data = call_user_func($data_callback);
+                    } catch (\Throwable) {
+                        continue;
+                    }
                 }
-                $this->ping($data);
+
+                if (!$this->ping($data)) {
+                    break;
+                }
             }
         });
     }
@@ -31,6 +44,7 @@ class WsConnection extends Client
             return;
         }
         Coroutine::cancel($this->autoping_cid);
+        unset($this->autoping_cid);
     }
 
     /**
@@ -49,17 +63,23 @@ class WsConnection extends Client
 
     public function pushJson(array|object $data): bool
     {
-        return $this->push(json_encode($data), WEBSOCKET_OPCODE_TEXT);
+        return $this->push(json_encode($data, JSON_THROW_ON_ERROR), WEBSOCKET_OPCODE_TEXT);
     }
 
-    public function ping(?string $data = null): bool
+    public function ping(string|array|null $data = null): bool
     {
-        return $this->push($data, WEBSOCKET_OPCODE_PING);
+        if(is_array($data)) {
+            $data = json_encode($data, JSON_THROW_ON_ERROR);
+        }
+        return $this->push($data ?? '', WEBSOCKET_OPCODE_PING);
     }
 
-    public function pong(?string $data = null): bool
+    public function pong(string|array|null $data = null): bool
     {
-        return $this->push($data, WEBSOCKET_OPCODE_PONG);
+        if(is_array($data)) {
+            $data = json_encode($data, JSON_THROW_ON_ERROR);
+        }
+        return $this->push($data ?? '', WEBSOCKET_OPCODE_PONG);
     }
 
     /**
@@ -70,8 +90,18 @@ class WsConnection extends Client
      */
     public function receive(float $timeout = 0): Frame|false|string
     {
+        $deadlineNs = $timeout > 0 ? hrtime(true) + (int) ($timeout * 1_000_000_000) : null;
+
         // Loop until we get a non-control frame or the receive operation fails/times out
         while (true) {
+            $remaining = $timeout;
+            if ($deadlineNs !== null) {
+                $remaining = ($deadlineNs - hrtime(true)) / 1_000_000_000;
+                if ($remaining <= 0.0) {
+                    return false;
+                }
+            }
+
             $frame = parent::recv($timeout);
 
             if ($frame === false) {
@@ -120,33 +150,65 @@ class WsConnection extends Client
 
     private function executeCloseEvent(): void
     {
+        if ($this->closed) {
+            return;
+        }
+        $this->closed = true;
+
         $this->stopAutoping();
         if(isset($this->event_close_handler)) {
             ($this->event_close_handler)($this);
         }
     }
 
-    public function receiveJson(float $timeout = 0): array|false
+    private function assertDataFrame(Frame|false|string $frame): Frame
     {
-        $frame = $this->receive($timeout);
         if ($frame === false) {
-            return false;
+            throw new WsFalseFrame();
+        }
+
+        if ($frame === '') {
+            throw new WsConnectionClosed('Peer closed the connection.');
+        }
+
+        if ($frame->opcode === WEBSOCKET_OPCODE_CLOSE) {
+            throw new WsConnectionClosed('Received a WebSocket CLOSE frame.');
+        }
+
+        return $frame;
+    }
+
+    public function receiveJson(float $timeout = 0): array|null
+    {
+        $frame = $this->assertDataFrame($this->receive($timeout));
+
+        if (!json_validate($frame->data)) {
+            $exception = new WsJsonNotValid('Frame data is not valid JSON string.');
+            $exception->frame = $frame;
+            throw $exception;
         }
         return json_decode($frame->data, true);
     }
 
-    public function receiveText(float $timeout = 0): string|false
+    public function receiveText(float $timeout = 0): string
     {
-        $frame = $this->receive($timeout);
-        if ($frame === false) {
-            return false;
-        }
-        return $frame->data;
+        return $this->assertDataFrame($this->receive($timeout))->data;
+    }
+
+    public function close(): bool
+    {
+        $this->stopAutoping();
+        return parent::close();
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->closed;
     }
 
     public function onClose(callable $callback): self
     {
-        $this->event_close_handler = $callback;
+        $this->event_close_handler = \Closure::fromCallable($callback);
         return $this;
     }
 }

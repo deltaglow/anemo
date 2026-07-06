@@ -4,7 +4,7 @@ namespace DeltaGlow\Anemo\Client;
 
 use DeltaGlow\Anemo\Exception\WsException;
 use DeltaGlow\Anemo\Response\WsConnection;
-use GuzzleHttp\Psr7\Uri;
+use Uri\Rfc3986\Uri;
 
 class WsClient extends BaseClient {
     public function upgrade(string|Uri $url): ?WsConnection
@@ -39,7 +39,7 @@ class WsClient extends BaseClient {
             $client->startAutoping($this->options['ws']['autoping_interval'], $this->options['ws']['autoping_data']);
         }
 
-        $upgraded = $client->upgrade((string)$this->buildPath($uri));
+        $upgraded = $client->upgrade($this->buildPath($uri));
         if (!$upgraded) {
             throw new WsException('WebSocket upgrade failed: ' . $client->errMsg);
         }

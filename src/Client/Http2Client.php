@@ -3,7 +3,7 @@
 namespace DeltaGlow\Anemo\Client;
 
 use DeltaGlow\Anemo\Response\Response;
-use GuzzleHttp\Psr7\Uri;
+use Uri\Rfc3986\Uri;
 use Swoole\Coroutine\Http2\Client;
 use Swoole\Http2\Request;
 

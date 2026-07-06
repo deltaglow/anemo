@@ -3,8 +3,9 @@
 namespace DeltaGlow\Anemo\Client;
 
 use DeltaGlow\Anemo\Pool;
-use GuzzleHttp\Psr7\Uri;
+use DeltaGlow\Anemo\Support\Proxy;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Uri\Rfc3986\Uri;
 
 abstract class BaseClient
 {
@@ -63,15 +64,17 @@ abstract class BaseClient
         $this->pool_key = $key;
     }
 
-    protected function buildPath(Uri $uri): Uri
-    {
-        $path = new Uri();
-        $path = $path->withPath($uri->getPath())
-            ->withQuery($uri->getQuery())
-            ->withFragment($uri->getFragment());
 
-        if($path->getPath() === '') {
-            $path = $path->withPath('/');
+    protected function buildPath(Uri $uri): string
+    {
+        $path = $uri->getPath() ?: '/';
+
+        if ($query = $uri->getQuery()) {
+            $path .= '?' . $query;
+        }
+
+        if ($fragment = $uri->getFragment()) {
+            $path .= '#' . $fragment;
         }
 
         return $path;
@@ -95,14 +98,15 @@ abstract class BaseClient
         // setup proxy
         if($this->options['proxy']['uri'] !== null) {
             // format username:password@host:port
-            $uri = new Uri($this->options['proxy']['uri']);
-            if($uri->getUserInfo() !== null) {
-                list($user, $pass) = explode(':', $uri->getUserInfo());
-                $settings['http_proxy_user'] = $user;
-                $settings['http_proxy_password'] = $pass;
+            $uri = Proxy::parse($this->options['proxy']['uri']);
+            $settings['http_proxy_host'] = $uri->host;
+            $settings['http_proxy_port'] = $uri->port;
+            if($uri->username !== null) {
+                $settings['http_proxy_user'] = $uri->username;
             }
-            $settings['http_proxy_host'] = $uri->getHost();
-            $settings['http_proxy_port'] = $uri->getPort();
+            if($uri->password !== null) {
+                $settings['http_proxy_password'] = $uri->password;
+            }
 
         } elseif($this->options['proxy']['host'] !== null) {
             $settings['http_proxy_host'] = $this->options['proxy']['host'];
