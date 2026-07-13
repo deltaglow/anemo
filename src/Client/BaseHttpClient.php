@@ -83,21 +83,27 @@ abstract class BaseHttpClient extends BaseClient
 
     private function buildUri(string|Uri $uri): Uri
     {
-        if(is_string($uri)) {
-            if(str_starts_with($uri, '/')) {
-                $uri = preg_replace('/^\/+/', '', $uri);
+        if (is_string($uri)) {
+            $parsed = Uri::parse($uri);
+            if ($parsed === null) {
+                throw new \InvalidArgumentException(sprintf('Invalid url string "%s"', $uri));
             }
-            $uri = Uri::parse($uri);
-            if($uri === null) {
-                throw new \InvalidArgumentException(sprintf('Invalid url string "%s"', $this->options['base_uri']));
-            }
+            $uri = $parsed;
         }
 
-        if ($this->options['base_uri'] !== null && $uri->getHost() === null) {
-            $uri = $uri->resolve($this->options['base_uri']);
+        if ($uri->getHost() !== null || $this->options['base_uri'] === null) {
+            return $uri;
         }
 
-        return $uri;
+        $base = new Uri($this->options['base_uri']);
+
+        $basePath = rtrim($base->getPath() ?? '', '/');
+        $relPath  = '/' . ltrim($uri->getPath() ?? '', '/');
+
+        return $base
+            ->withPath($basePath . $relPath)
+            ->withQuery($uri->getQuery())
+            ->withFragment($uri->getFragment());
     }
 
     protected function prepareBody(string|array $data): string|false
