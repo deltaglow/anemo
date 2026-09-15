@@ -11,17 +11,14 @@ class WsClientTest extends TestCase
     {
         $client = new WsClient([
             'timeout' => 10,
-            'ssl_verify_peer' => false
+            'ssl' => ['verify_peer' => false],
         ]);
 
         $reflection = new \ReflectionClass($client);
+        $options = $reflection->getProperty('options');
+        $resolved = $options->getValue($client);
 
-        $timeout = $reflection->getProperty('timeout');
-        $timeout->setAccessible(true);
-        $this->assertEquals(10, $timeout->getValue($client));
-
-        $ssl = $reflection->getProperty('ssl_verify_peer');
-        $ssl->setAccessible(true);
-        $this->assertFalse($ssl->getValue($client));
+        $this->assertEquals(10, $resolved['timeout']);
+        $this->assertFalse($resolved['ssl']['verify_peer']);
     }
 }

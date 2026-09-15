@@ -9,6 +9,9 @@ use Uri\Rfc3986\Uri;
 
 abstract class BaseHttpClient extends BaseClient
 {
+    protected const DEFAULT_SCHEME = 'http';
+    protected const SECURE_SCHEMES = ['https'];
+
     protected BodyFormat $body_format = BodyFormat::Text;
 
     abstract protected function doRequest(string $method, Uri $uri, string|array $body): Response;
@@ -79,31 +82,6 @@ abstract class BaseHttpClient extends BaseClient
         $this->body_format = BodyFormat::FormParams;
         $this->headers['Content-Type'] = 'application/x-www-form-urlencoded';
         return $this;
-    }
-
-    private function buildUri(string|Uri $uri): Uri
-    {
-        if (is_string($uri)) {
-            $parsed = Uri::parse($uri);
-            if ($parsed === null) {
-                throw new \InvalidArgumentException(sprintf('Invalid url string "%s"', $uri));
-            }
-            $uri = $parsed;
-        }
-
-        if ($uri->getHost() !== null || $this->options['base_uri'] === null) {
-            return $uri;
-        }
-
-        $base = new Uri($this->options['base_uri']);
-
-        $basePath = rtrim($base->getPath() ?? '', '/');
-        $relPath  = '/' . ltrim($uri->getPath() ?? '', '/');
-
-        return $base
-            ->withPath($basePath . $relPath)
-            ->withQuery($uri->getQuery())
-            ->withFragment($uri->getFragment());
     }
 
     protected function prepareBody(string|array $data): string|false

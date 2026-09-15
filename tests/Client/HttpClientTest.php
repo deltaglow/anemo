@@ -6,17 +6,17 @@ use DeltaGlow\Anemo\Client\HttpClient;
 use Uri\Rfc3986\Uri;
 use PHPUnit\Framework\TestCase;
 
+#[\PHPUnit\Framework\Attributes\RequiresPhpExtension('uri')]
 class HttpClientTest extends TestCase
 {
     public function testBuildSettingsProxy(): void
     {
         $client = new HttpClient([
-            'proxy_uri' => 'http://user:pass@127.0.0.1:8080'
+            'proxy' => ['uri' => 'http://user:pass@127.0.0.1:8080'],
         ]);
 
         $reflection = new \ReflectionClass($client);
         $method = $reflection->getMethod('buildSettings');
-        $method->setAccessible(true);
         $settings = $method->invoke($client);
 
         $this->assertEquals('127.0.0.1', $settings['http_proxy_host']);
@@ -32,7 +32,6 @@ class HttpClientTest extends TestCase
 
         $reflection = new \ReflectionClass($client);
         $property = $reflection->getProperty('cookies');
-        $property->setAccessible(true);
 
         $this->assertEquals(['foo' => 'bar'], $property->getValue($client));
 
@@ -47,7 +46,6 @@ class HttpClientTest extends TestCase
 
         $reflection = new \ReflectionClass($client);
         $property = $reflection->getProperty('headers');
-        $property->setAccessible(true);
 
         $this->assertEquals(['X-Test' => '1'], $property->getValue($client));
 
@@ -60,11 +58,13 @@ class HttpClientTest extends TestCase
         $client = new HttpClient();
         $reflection = new \ReflectionClass($client);
         $method = $reflection->getMethod('buildPath');
-        $method->setAccessible(true);
 
-        $uri = new Uri('https://example.com/foo?bar=baz');
-        $path = $method->invoke($client, $uri);
+        $this->assertEquals('/foo?bar=baz', $method->invoke($client, new Uri('https://example.com/foo?bar=baz')));
 
-        $this->assertEquals('/foo?bar=baz', (string) $path);
+        // an empty path is still a valid request target
+        $this->assertEquals('/', $method->invoke($client, new Uri('https://example.com')));
+
+        // the fragment is a client side concern and must never reach the request line
+        $this->assertEquals('/foo?bar=baz', $method->invoke($client, new Uri('https://example.com/foo?bar=baz#frag')));
     }
 }

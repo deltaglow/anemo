@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- PHP >= 8.1
+- PHP >= 8.5 (uses `ext-uri`, bundled since 8.5)
 - ext-swoole >= 6.0
 - ext-json
 
@@ -34,6 +34,48 @@ var_dump($response->getBody());
 // POST request with JSON body
 $response = $client->asJson()->post('https://api.example.com/users', ['name' => 'John Doe', 'email' => 'john@example.com']);
 ```
+
+### Addressing a host
+
+Targets may be given as a `string` or as a `Uri\Rfc3986\Uri`. When no `base_uri` is set, a
+target without a scheme is treated as absolute and gets the client's default scheme
+(`http` for `Anemo::http()` / `Anemo::http2()`, `ws` for `Anemo::ws()`):
+
+```php
+$client = Anemo::http();
+
+$client->get('http://192.168.1.10:8080/status');  // explicit
+$client->get('192.168.1.10:8080/status');         // same thing
+$client->get('192.168.1.10/status');              // port 80
+$client->get('[2001:db8::1]:8080/status');        // IPv6 literals must be bracketed
+$client->get('//192.168.1.10/status');            // scheme relative
+```
+
+This matters because RFC 3986 does not accept `192.168.1.10:8080/status` as a URL: a scheme
+has to start with a letter. Anemo prefixes the default scheme so IP targets behave the way
+you would expect.
+
+When `base_uri` **is** set, a scheme-less target is a relative reference and is resolved
+against the base per RFC 3986:
+
+```php
+$client = Anemo::http(['base_uri' => 'http://192.168.1.10:8080/api/v1/']);
+
+$client->get('users');      // http://192.168.1.10:8080/api/v1/users
+$client->get('/users');     // http://192.168.1.10:8080/users
+$client->get('../admin');   // http://192.168.1.10:8080/api/admin
+$client->get('https://other.example/x');  // absolute targets win over the base
+```
+
+> **HTTPS to an IP address.** `ssl.verify_peer` is on by default, so the certificate is
+> checked against the address you connected to. Unless the certificate carries a matching IP
+> SAN the handshake will fail. Either point `ssl.host_name` at the name on the certificate,
+> or turn verification off:
+>
+> ```php
+> Anemo::http(['ssl' => ['host_name' => 'api.example.com']]);
+> Anemo::http(['ssl' => ['verify_peer' => false]]);   // not recommended
+> ```
 
 ### HTTP/2 Request
 
@@ -111,7 +153,7 @@ The client factory methods accept an array of options:
 
 | Option            | Type   | Default | Description                                          |
 |-------------------|--------|---------|------------------------------------------------------|
-| `base_uri`   | `string \| null` |  `null` | Base URI for requests (prepended to relative paths). |
+| `base_uri`   | `string \| null` |  `null` | Base URI. Scheme-less targets are then resolved against it as relative references. |
 | `timeout`    | `int \| null`    |     `0` | Request timeout in seconds (`0` is no timeout).      |
 | `keep_alive` | `bool`           | `false` | Whether to reuse connections (HTTP keep-alive).      |
 | `proxy.uri`      | `string \| null` |  `null` | Full proxy URI (e.g., `http://user:pass@host:port`). If set, it override the individual host/port/user/password fields. |

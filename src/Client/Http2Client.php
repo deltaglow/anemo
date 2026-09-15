@@ -11,12 +11,10 @@ class Http2Client extends BaseHttpClient
 {
     protected function doRequest(string $method, Uri $uri, string|array $body = ''): Response
     {
-        $port = $uri->getPort();
-        if ($port === null) {
-            $port = $uri->getScheme() === 'https' ? 443 : 80;
-        }
+        $secure = $this->isSecure($uri);
+        $port = $this->resolvePort($uri, $secure);
 
-        $client = new Client($uri->getHost(), $port, $uri->getScheme() === 'https');
+        $client = new Client($this->connectHost($uri), $port, $secure);
         $client->set($this->buildSettings());
 
         if (!$client->connect()) {
@@ -26,7 +24,7 @@ class Http2Client extends BaseHttpClient
         $request = new Request();
         $request->method = $method;
         $request->path = $this->buildPath($uri);
-        $request->headers = $this->headers;
+        $request->headers = $this->buildHeaders($uri, $port, $secure);
         $request->cookies = $this->cookies;
         $request->data = $this->prepareBody($body);
 

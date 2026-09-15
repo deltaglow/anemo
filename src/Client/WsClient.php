@@ -7,11 +7,12 @@ use DeltaGlow\Anemo\Response\WsConnection;
 use Uri\Rfc3986\Uri;
 
 class WsClient extends BaseClient {
+    protected const DEFAULT_SCHEME = 'ws';
+    protected const SECURE_SCHEMES = ['wss', 'https'];
+
     public function upgrade(string|Uri $url): ?WsConnection
     {
-        if(is_string($url)) {
-            $uri = new Uri($url);
-        }
+        $uri = $this->buildUri($url);
 
         if ($this->pool) {
             $this->pool->addRequest($this->pool_key, function () use ($uri) {
@@ -25,14 +26,12 @@ class WsClient extends BaseClient {
 
     protected function doUpgrade(Uri $uri): WsConnection
     {
-        $port = $uri->getPort();
-        if($port === null) {
-            $port = $uri->getScheme() === 'wss' ? 443 : 80;
-        }
+        $secure = $this->isSecure($uri);
+        $port = $this->resolvePort($uri, $secure);
 
-        $client = new WsConnection($uri->getHost(), $port, $uri->getScheme() === 'wss');
+        $client = new WsConnection($this->connectHost($uri), $port, $secure);
         $client->set($this->buildSettings());
-        $client->setHeaders($this->headers);
+        $client->setHeaders($this->buildHeaders($uri, $port, $secure));
         $client->setCookies($this->cookies);
 
         if($this->options['ws']['autoping']) {
