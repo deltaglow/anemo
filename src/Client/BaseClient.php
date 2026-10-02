@@ -84,39 +84,62 @@ abstract class BaseClient
      */
     protected function buildUri(string|Uri $uri): Uri
     {
-        $base = null;
-
-        if ($this->options['base_uri'] !== null) {
-            $base = Uri::parse($this->addDefaultScheme($this->options['base_uri']));
-
-            if ($base === null || $base->getHost() === null) {
-                throw new \InvalidArgumentException(
-                    sprintf('Option "base_uri" must be an absolute url, "%s" given.', $this->options['base_uri'])
-                );
-            }
-        }
+        $base = $this->getBaseUri();
 
         if ($uri instanceof Uri) {
             if ($uri->getHost() !== null || $base === null) {
                 return $uri;
             }
 
-            return $base->resolve($uri->toString());
+            // Relative Uri object goes through the same logic as a string
+            $uri = $uri->toString();
         }
 
-        if ($base === null) {
-            $uri = $this->addDefaultScheme($uri);
-        }
-
-        // With a base the second argument resolves the reference per RFC 3986,
-        // which also normalises dot segments and inherits the base query/fragment.
-        $parsed = Uri::parse($uri, $base);
+        $parsed = $base === null
+            ? Uri::parse($this->addDefaultScheme($uri))
+            : Uri::parse($this->toBaseRelativeReference($uri), $base);
 
         if ($parsed === null) {
             throw new \InvalidArgumentException(sprintf('Invalid url string "%s"', $uri));
         }
 
         return $parsed;
+    }
+
+    private function getBaseUri(): ?Uri
+    {
+        $raw = $this->options['base_uri'];
+
+        if ($raw === null) {
+            return null;
+        }
+
+        $base = Uri::parse($this->addDefaultScheme($raw));
+
+        if ($base === null || $base->getHost() === null) {
+            throw new \InvalidArgumentException(
+                sprintf('Option "base_uri" must be an absolute url, "%s" given.', $raw)
+            );
+        }
+
+        // "/v1" -> "/v1/", otherwise RFC 3986 resolution drops the last segment
+        $path = $base->getPath();
+        if (!str_ends_with($path, '/')) {
+            $base = $base->withPath($path . '/');
+        }
+
+        return $base;
+    }
+
+    private function toBaseRelativeReference(string $uri): string
+    {
+        // "/users" -> "users" so it resolves under the base path.
+        // Network-path references ("//other.host/...") are left untouched.
+        if (str_starts_with($uri, '/') && !str_starts_with($uri, '//')) {
+            return substr($uri, 1);
+        }
+
+        return $uri;
     }
 
     /**
